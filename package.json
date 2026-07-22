@@ -1,6 +1,6 @@
 {
   "name": "@pipeworx/mcp-censtatd-hk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hong Kong Census and Statistics Department (C&SD) open-data MCP.",
   "type": "module",
   "main": "src/index.ts",

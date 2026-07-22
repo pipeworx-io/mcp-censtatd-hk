@@ -104,10 +104,58 @@ const tools: McpToolExport['tools'] = [
   },
 ];
 
+const VALID_TABLE_ID = /^\d{3}-\d{5}$/;
+
+// Run a CKAN keyword search restricted to C&SD tables → parsed {id,title} list.
+async function searchTables(query: string, limit: number) {
+  const q = `${query} hk-censtatd-tablechart`;
+  const data = (await csdGet(`${CKAN}?q=${encodeURIComponent(q)}&rows=${limit}`)) as CkanResponse;
+  const results = (data.result?.results ?? [])
+    .map((p) => {
+      const text = `${p.title ?? ''} ${p.name ?? ''}`;
+      const m = text.match(/(\d{3}-\d{5})/);
+      return m ? { id: m[1], title: (p.title ?? '').replace(/\s+/g, ' ').trim() } : null;
+    })
+    .filter((x): x is { id: string; title: string } => x !== null);
+  return { totalMatches: data.result?.count ?? results.length, results };
+}
+
+// Resolve the caller's input to a valid table id. Agents frequently call
+// get_table/table_info with a TOPIC ("GDP", "population") or no id at all
+// instead of a "310-31001" id — the #1 error source. When the input isn't a
+// valid id, search for it and return candidate ids so the retry succeeds
+// (rather than a hard "missing id" error). Returns either {id} or a response
+// object the caller should return as-is.
+async function resolveTableId(args: Record<string, unknown>): Promise<{ id: string } | { candidates: unknown }> {
+  const raw = String(
+    args.id ?? args.table ?? args.tableId ?? args.query ?? args.topic ?? args.keyword ?? args.q ?? '',
+  ).trim();
+  if (VALID_TABLE_ID.test(raw)) return { id: raw };
+  // Try to pull an embedded id like "web_table.html?id=310-31001" or "310-31001 GDP".
+  const embedded = raw.match(/(\d{3}-\d{5})/);
+  if (embedded) return { id: embedded[1] };
+  if (!raw) {
+    return { candidates: { error: 'no_table_id', message: "Provide a Hong Kong C&SD table id like '310-31001', or a topic to search (e.g. { id: 'GDP' }). Use censtatd_search_tables to browse.", hint: 'Call again with a valid id from censtatd_search_tables.' } };
+  }
+  const { results } = await searchTables(raw, 8);
+  return {
+    candidates: {
+      resolved: false,
+      query: raw,
+      message: results.length
+        ? `"${raw}" is not a table id. Closest Hong Kong C&SD tables — call again with one of these ids:`
+        : `No Hong Kong C&SD tables matched "${raw}". Try broader keywords via censtatd_search_tables.`,
+      candidates: results,
+    },
+  };
+}
+
 async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
   switch (name) {
     case 'censtatd_get_table': {
-      const id = reqStr(args, 'id', "'310-31001'");
+      const resolved = await resolveTableId(args);
+      if ('candidates' in resolved) return resolved.candidates;
+      const id = resolved.id;
       const lang = langOf(args);
       const param = typeof args.param === 'string' && args.param.trim() ? args.param.trim() : '';
       const qs = param
@@ -126,7 +174,9 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       };
     }
     case 'censtatd_table_info': {
-      const id = reqStr(args, 'id', "'310-31001'");
+      const resolved = await resolveTableId(args);
+      if ('candidates' in resolved) return resolved.candidates;
+      const id = resolved.id;
       const lang = langOf(args);
       // 'N4XyA' is the lz-string (compressToEncodedURIComponent) encoding of "{}" — the
       // minimal valid param. An empty selection yields the header (title/tablenote/source)
@@ -143,23 +193,10 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
     }
     case 'censtatd_search_tables': {
       const query = reqStr(args, 'query', "'exchange rates'");
-      const limit = clampLimit(args.limit);
-      // Restrict to C&SD tablechart datasets, AND the caller's keywords.
-      const q = `${query} hk-censtatd-tablechart`;
-      const url = `${CKAN}?q=${encodeURIComponent(q)}&rows=${limit}`;
-      const data = (await csdGet(url)) as CkanResponse;
-      const results = (data.result?.results ?? [])
-        .map((p) => {
-          const text = `${p.title ?? ''} ${p.name ?? ''}`;
-          const m = text.match(/(\d{3}-\d{5})/);
-          return m
-            ? { id: m[1], title: (p.title ?? '').replace(/\s+/g, ' ').trim() }
-            : null;
-        })
-        .filter((x): x is { id: string; title: string } => x !== null);
+      const { totalMatches, results } = await searchTables(query, clampLimit(args.limit));
       return {
         query,
-        totalMatches: data.result?.count ?? results.length,
+        totalMatches,
         returned: results.length,
         note: 'Pass an id to censtatd_get_table. Tables without a parseable id are omitted.',
         tables: results,
@@ -186,12 +223,20 @@ interface CkanResponse {
 }
 
 async function csdGet(url: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': UA } });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`C&SD: ${res.status} ${body.slice(0, 200)}`);
+  // censtatd.gov.hk intermittently 5xx's (mostly 502) — the top error class on
+  // this pack. Retry transient 5xx up to twice with a short backoff before
+  // surfacing; a 4xx (bad request) fails fast since a retry won't help.
+  let lastBody = '';
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': UA } });
+    if (res.ok) return res.json();
+    lastStatus = res.status;
+    lastBody = await res.text();
+    if (res.status < 500 || attempt === 2) break;
+    await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
   }
-  return res.json();
+  throw new Error(`C&SD: ${lastStatus} ${lastBody.slice(0, 200)}`);
 }
 
 // C&SD signals validation errors with HTTP 200 + header.status.name === "Fail".
