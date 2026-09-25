@@ -3,7 +3,7 @@
   "name": "io.github.pipeworx-io/censtatd-hk",
   "title": "Censtatd Hk",
   "description": "Hong Kong Census and Statistics Department (C&SD) open-data MCP.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "websiteUrl": "https://pipeworx.io/packs/censtatd-hk",
   "repository": {
     "url": "https://github.com/pipeworx-io/mcp-censtatd-hk",
