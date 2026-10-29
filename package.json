@@ -1,12 +1,20 @@
 {
   "name": "@pipeworx/mcp-censtatd-hk",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Hong Kong Census and Statistics Department (C&SD) open-data MCP.",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./tools.json": "./tools.json",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "mcp-censtatd-hk": "bin/cli.js"
+  },
+  "files": ["bin/", "lib/", "tools.json", "server.json"],
+  "engines": {
+    "node": ">=18"
   },
   "keywords": ["mcp", "mcp-server", "model-context-protocol", "pipeworx", "censtatd-hk"],
   "license": "MIT",
@@ -14,19 +22,12 @@
     "type": "git",
     "url": "git+https://github.com/pipeworx-io/mcp-censtatd-hk.git"
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "tsx": "^4.19.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3",
-    "@cloudflare/workers-types": "^4.20260405.1"
-  },
+  "mcpName": "io.github.pipeworx-io/censtatd-hk",
   "pipeworx": {
-    "sourceHash": "v1-1da61f0aa66aa75c9c3c6f08f790de1c654359ab707bc97d80b5295fc291b187",
-    "sourceCommit": "70a4e816a9195016cd4af92dca2019485d4c3865"
+    "mode": "gateway",
+    "slug": "censtatd-hk",
+    "gatewaySlug": "censtatd-hk",
+    "sourceHash": "v1-0eb7c56a7cfa7259a100c5be217f0f48af567ef7a9ed550fa35583326328b59b",
+    "sourceCommit": "4277282d72f9bf55e548b3799aaf737baf22152f"
   }
 }
