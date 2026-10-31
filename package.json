@@ -1,6 +1,6 @@
 {
   "name": "@pipeworx/mcp-censtatd-hk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Hong Kong Census and Statistics Department (C&SD) open-data MCP.",
   "type": "module",
   "main": "lib/index.js",
@@ -27,7 +27,7 @@
     "mode": "gateway",
     "slug": "censtatd-hk",
     "gatewaySlug": "censtatd-hk",
-    "sourceHash": "v1-0eb7c56a7cfa7259a100c5be217f0f48af567ef7a9ed550fa35583326328b59b",
-    "sourceCommit": "4277282d72f9bf55e548b3799aaf737baf22152f"
+    "sourceHash": "v1-82e186df074dd85f678dbb3b203aa6c28712c435d63876b1b4ed9884d2bd47a1",
+    "sourceCommit": "547a3983b42dacf4389ca474860b0a1dee8e6053"
   }
 }
